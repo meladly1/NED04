@@ -145,7 +145,7 @@
 
   <script>
     // ======= CONFIGURE THESE =======
-    const TEMPLATE_URL = "https://raw.githubusercontent.com/your-user/your-repo/main/path/to/template.xlsx"; // replace
+    const TEMPLATE_URL = "example_template.xlsx"; // replace
     const UPLOAD_ENDPOINT = "https://script.google.com/macros/s/XXXX_DEPLOYMENT_ID/exec"; // replace
     // ======= END CONFIG =======
 
@@ -213,6 +213,9 @@
         fd.append('affiliation', affiliation);
         fd.append('originalFilename', file.name);
         fd.append('file', file, file.name);
+
+        fd.append('token', 'vcxvfdgdfgdfgfmvnvbnvbnbdgdfgfdgdfdsdsdsdsvxcxccbvbvbvbv');  // use your token
+
 
         const res = await fetch(UPLOAD_ENDPOINT, { method: 'POST', body: fd });
         const data = await res.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
