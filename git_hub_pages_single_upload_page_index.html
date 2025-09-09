@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Data Upload Portal</title>
+  <!--
+    HOW TO USE
+    1) Replace the two constants below:
+         - TEMPLATE_URL: direct link to your XLSX on GitHub (raw link or release asset)
+         - UPLOAD_ENDPOINT: your Google Apps Script Web App URL (see script in chat)
+    2) Commit this file to a repo as index.html, then enable GitHub Pages.
+  -->
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121933;
+      --panel-2: #0f1530;
+      --text: #f4f6ff;
+      --muted: #c6cae2;
+      --accent: #5aa7ff;
+      --accent-2: #4ad295;
+      --danger: #ff6b6b;
+      --border: #2a355f;
+      --focus: #93c5fd;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      background: radial-gradient(1200px 600px at 10% -10%, #1e2648 0%, transparent 70%),
+                  radial-gradient(900px 500px at 110% -20%, #10204b 0%, transparent 70%),
+                  var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+    }
+    .wrap { max-width: 920px; margin: 48px auto; padding: 0 20px; }
+    .card {
+      background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px; padding: 28px; box-shadow: 0 10px 30px rgba(0,0,0,.25);
+    }
+    h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: .2px; }
+    .sub { color: var(--muted); margin-bottom: 22px; }
+
+    .grid { display: grid; gap: 18px; grid-template-columns: 1fr; }
+    @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } }
+    label { display: block; font-weight: 600; margin-bottom: 6px; }
+    input[type="text"], input[type="email"] {
+      width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+      background: #0e1533; color: var(--text); outline: none; transition: border .15s, box-shadow .15s;
+    }
+    input:focus { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(147,197,253,.25); }
+
+    .file-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+    .file-pill { padding: 8px 12px; background: #0c1430; border: 1px dashed var(--border); border-radius: 999px; color: var(--muted); font-size: 14px; }
+
+    .btn {
+      appearance: none; border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 700;
+      cursor: pointer; transition: transform .03s ease, filter .2s ease; letter-spacing: .2px;
+      display: inline-flex; align-items: center; gap: 10px;
+    }
+    .btn:active { transform: translateY(1px); }
+    .btn-primary { background: linear-gradient(180deg, #5aa7ff 0%, #3f83f8 100%); color: #061025; }
+    .btn-secondary { background: linear-gradient(180deg, #2c385f 0%, #212b4b 100%); color: var(--text); border: 1px solid var(--border); }
+    .btn[disabled] { opacity: .6; cursor: not-allowed; }
+
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .hint { color: var(--muted); font-size: 14px; }
+    .link { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--accent); }
+    .link:hover { filter: brightness(1.1); }
+
+    .instructions { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--border); }
+    .instructions h2 { margin: 0 0 10px; font-size: 20px; }
+    .instructions p { margin: 10px 0; }
+    .instructions ul { margin: 10px 0 0 20px; }
+
+    .msg { margin-top: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid transparent; display: none; }
+    .msg.ok { display: block; background: rgba(74, 210, 149, .12); border-color: rgba(74, 210, 149, .45); }
+    .msg.err { display: block; background: rgba(255, 107, 107, .12); border-color: rgba(255, 107, 107, .55); }
+    .spinner { width: 18px; height: 18px; border-radius: 50%; border: 3px solid rgba(255,255,255,.35); border-top-color: white; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    footer { margin-top: 20px; color: var(--muted); font-size: 13px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Upload new data</h1>
+      <div class="sub">Fill in your details, download the template, then upload the completed file.</div>
+
+      <form id="uploadForm" novalidate>
+        <div class="grid">
+          <div>
+            <label for="name">Your name</label>
+            <input id="name" name="name" type="text" placeholder="Jane Doe" required />
+          </div>
+          <div>
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="jane@example.com" required />
+          </div>
+          <div>
+            <label for="affiliation">Affiliation</label>
+            <input id="affiliation" name="affiliation" type="text" placeholder="Institution or Company" required />
+          </div>
+        </div>
+
+        <div class="instructions">
+          <h2>Instructions</h2>
+          <p>
+            Use the template (<a id="templateLink" class="link" href="#" download>download template</a>) to upload new data to the database. Example data is provided in the template. Remove all example data, add data to each tab as applicable (okay to leave tabs blank), and upload the modified file. Do not modify column headers. All "id" fields (a.k.a., primary keys) must be unique. All columns that are the names of other tabs (e.g., "reference" column in the "experiment" tab; a.k.a., foreign keys) link data in one tab to another (e.g., link a particular reference with this experiment entry); all such "foreign key" entries must match the "id" in the other tab of interest. Data that are not properly entered will be flagged in an error message below. The following provides a brief overview of the type of data in each tab.
+          </p>
+          <ul>
+            <li><strong>Component:</strong> Represents a type of building component, storing its name and NISTIR taxonomy subelement classification. It is used to categorize experiments and fragility models.</li>
+            <li><strong>Experiment:</strong> Represents an experimental observation, storing details about the test: test type, loading protocol, peak test amplitude, and damage state description. It is linked to a reference and a component type.</li>
+            <li><strong>ExperimentFragilityModelBridge:</strong> Facilitates a many-to-many relationship between experiments and fragility models, allowing multiple experiments to be associated with multiple fragility models.</li>
+            <li><strong>FragilityModel:</strong> Represents a fragility model, storing information about the component type, detailing, material, and size class. It is used to group related fragility curves.</li>
+            <li><strong>FragilityCurve:</strong> Represents an individual fragility curve, storing parameters such as median, beta, and probability, as well as metadata like source, basis, and number of observations. It is linked to a fragility model and a reference.</li>
+            <li><strong>Reference:</strong> Represents a reference to a research publication, storing metadata such as title, author, year, and study type. It is used to document experimental observations or fragility models.</li>
+          </ul>
+
+          <div class="row" style="margin-top:16px; align-items:center;">
+            <input id="file" name="file" type="file" accept=".xlsx,.xlsm" style="display:none" />
+            <button id="chooseBtn" class="btn btn-secondary" type="button">Choose file</button>
+            <span id="fileName" class="file-pill">No file selected</span>
+          </div>
+
+          <div class="row" style="margin-top:12px; align-items:center;">
+            <button id="uploadBtn" class="btn btn-primary" type="submit">
+              <span class="btn-label">Upload data</span>
+            </button>
+            <span class="hint">Accepted: .xlsx or .xlsm. Keep sheet headers unchanged.</span>
+          </div>
+
+          <div id="message" class="msg" role="status" aria-live="polite"></div>
+        </div>
+      </form>
+
+      <footer>
+        Questions or issues? Contact the maintainer.
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    // ======= CONFIGURE THESE =======
+    const TEMPLATE_URL = "https://raw.githubusercontent.com/your-user/your-repo/main/path/to/template.xlsx"; // replace
+    const UPLOAD_ENDPOINT = "https://script.google.com/macros/s/XXXX_DEPLOYMENT_ID/exec"; // replace
+    // ======= END CONFIG =======
+
+    const templateLink = document.getElementById('templateLink');
+    templateLink.href = TEMPLATE_URL;
+
+    const fileInput = document.getElementById('file');
+    const chooseBtn = document.getElementById('chooseBtn');
+    const fileName = document.getElementById('fileName');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const form = document.getElementById('uploadForm');
+    const msg = document.getElementById('message');
+
+    chooseBtn.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', () => {
+      fileName.textContent = fileInput.files?.[0]?.name || 'No file selected';
+    });
+
+    function showMsg(kind, text) {
+      msg.className = 'msg ' + (kind === 'ok' ? 'ok' : 'err');
+      msg.textContent = text;
+    }
+
+    function setLoading(isLoading) {
+      if (isLoading) {
+        uploadBtn.disabled = true;
+        uploadBtn.innerHTML = '<span class="spinner" aria-hidden="true"></span><span> Uploading…</span>';
+      } else {
+        uploadBtn.disabled = false;
+        uploadBtn.innerHTML = '<span class="btn-label">Upload data</span>';
+      }
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      msg.className = 'msg'; msg.textContent = '';
+
+      const name = document.getElementById('name').value.trim();
+      const email = document.getElementById('email').value.trim();
+      const affiliation = document.getElementById('affiliation').value.trim();
+      const file = fileInput.files?.[0] || null;
+
+      if (!name || !email || !affiliation) {
+        showMsg('err', 'Please fill in your name, email, and affiliation.');
+        return;
+      }
+      if (!file) {
+        showMsg('err', 'Please choose a file to upload.');
+        return;
+      }
+      if (!/\.xlsx$|\.xlsm$/i.test(file.name)) {
+        showMsg('err', 'File type must be .xlsx or .xlsm.');
+        return;
+      }
+      if (file.size > 25 * 1024 * 1024) { // 25 MB client-side guard
+        showMsg('err', 'File is larger than 25 MB. Please split it or contact the maintainer.');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const fd = new FormData();
+        fd.append('name', name);
+        fd.append('email', email);
+        fd.append('affiliation', affiliation);
+        fd.append('originalFilename', file.name);
+        fd.append('file', file, file.name);
+
+        const res = await fetch(UPLOAD_ENDPOINT, { method: 'POST', body: fd });
+        const data = await res.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
+
+        if (res.ok && data.success) {
+          showMsg('ok', 'Upload successful. Thank you.');
+          form.reset();
+          fileName.textContent = 'No file selected';
+        } else {
+          const detail = data && data.message ? ' ' + String(data.message) : '';
+          showMsg('err', 'Upload failed.' + detail);
+        }
+      } catch (err) {
+        showMsg('err', 'Network error. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>
