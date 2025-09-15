@@ -179,61 +179,82 @@
       }
     }
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      msg.className = 'msg'; msg.textContent = '';
-
-      const name = document.getElementById('name').value.trim();
-      const email = document.getElementById('email').value.trim();
-      const affiliation = document.getElementById('affiliation').value.trim();
-      const file = fileInput.files?.[0] || null;
-
-      if (!name || !email || !affiliation) {
-        showMsg('err', 'Please fill in your name, email, and affiliation.');
-        return;
-      }
-      if (!file) {
-        showMsg('err', 'Please choose a file to upload.');
-        return;
-      }
-      if (!/\.xlsx$|\.xlsm$/i.test(file.name)) {
-        showMsg('err', 'File type must be .xlsx.');
-        return;
-      }
-      if (file.size > 25 * 1024 * 1024) { // 25 MB client-side guard
-        showMsg('err', 'File is larger than 25 MB. Please split it or contact the maintainer.');
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const fd = new FormData();
-        fd.append('name', name);
-        fd.append('email', email);
-        fd.append('affiliation', affiliation);
-        fd.append('originalFilename', file.name);
-        fd.append('file', file, file.name);
-
-        fd.append('token', 'vcxvfdgdfgdfgfmvnvbnvbnbdgdfgfdgdfdsdsdsdsvxcxccbvbvbvbv');  // use your token
-
-
-        const res = await fetch(UPLOAD_ENDPOINT, { method: 'POST', body: fd });
-        const data = await res.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
-
-        if (res.ok && data.success) {
-          showMsg('ok', 'Upload successful. Thank you.');
-          form.reset();
-          fileName.textContent = 'No file selected';
-        } else {
-          const detail = data && data.message ? ' ' + String(data.message) : '';
-          showMsg('err', 'Upload failed.' + detail);
-        }
-      } catch (err) {
-        showMsg('err', 'Network error. Please try again.');
-      } finally {
-        setLoading(false);
-      }
+      async function fileToBase64(file) {
+    // Use FileReader to avoid huge memory spikes
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error('File read failed'));
+      reader.onload = () => {
+        const result = String(reader.result || '');
+        // result is like "data:...;base64,AAAA..."
+        const comma = result.indexOf('base64,');
+        resolve(comma >= 0 ? result.slice(comma + 7) : '');
+      };
+      reader.readAsDataURL(file);
     });
-  </script>
-</body>
-</html>
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msg.className = 'msg'; msg.textContent = '';
+
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const affiliation = document.getElementById('affiliation').value.trim();
+    const file = fileInput.files?.[0] || null;
+
+    if (!name || !email || !affiliation) {
+      showMsg('err', 'Please fill in your name, email, and affiliation.');
+      return;
+    }
+    if (!file) {
+      showMsg('err', 'Please choose a file to upload.');
+      return;
+    }
+    if (!/\.xlsx$|\.xlsm$/i.test(file.name)) {
+      showMsg('err', 'File type must be .xlsx.');
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      showMsg('err', 'File is larger than 25 MB. Please split it or contact the maintainer.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const dataBase64 = await fileToBase64(file);
+
+      const payload = {
+        token: 'vcxvfdgdfgdfgfmvnvbnvbnbdgdfgfdgdfdsdsdsdsvxcxccbvbvbvbv',
+        name,
+        email,
+        affiliation,
+        originalFilename: file.name,
+        mime: file.type || '',
+        dataBase64
+      };
+
+      const res = await fetch(UPLOAD_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' }, // simple request
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json().catch(() => ({ success: false, message: 'Unexpected server response.' }));
+
+      if (res.ok && data.success) {
+        showMsg('ok', 'Upload successful. Thank you.');
+        form.reset();
+        fileName.textContent = 'No file selected';
+      } else {
+        const detail = data && data.message ? ' ' + String(data.message) : '';
+        showMsg('err', 'Upload failed.' + detail);
+      }
+    } catch (err) {
+      showMsg('err', 'Network or encoding error. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  });
+</script>
